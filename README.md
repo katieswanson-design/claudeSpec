@@ -80,6 +80,8 @@ Claude will handle the rest — connecting to Figma, extracting data, importing 
 
 ## Example prompts
 
+For the full collection of ready-to-use prompts (individual specs + the all-in-one suite), see **[docs/prompts.md](docs/prompts.md)**.
+
 ### First time setup
 ```
 I need to set up claudeSpec. My template library file is here:
