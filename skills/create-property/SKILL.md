@@ -1544,3 +1544,52 @@ return { success: true };
 - **Combination cap** (3d-iii): For containers with 3+ sub-booleans, the full power set may be too large. Limit unified slot chapters to ~6 meaningful combinations, omitting edge cases. Focus on the most common designer workflows (all off, each on individually, all on) and skip unlikely combinations.
 - **Sibling boolean collapsing** (3d-iv / 6g): When a child component has 2+ boolean properties that are not consumed by container-gating (3d-ii/iii), they are collapsed into a single combinatorial chapter. For example, a Label child with "Show icon" (default: false) and "Character count" (default: true) becomes a single "Label" chapter with 4 previews: None, Character count (default), Icon, Character count + Icon. The default label is computed from the actual boolean defaults. Short names are derived by stripping common prefixes/verbs (e.g., "Show icon" → "Icon"). If only 1 boolean remains after filtering, it is rendered as a standard boolean chapter (6e-ii) instead.
 - **Graceful fallback for normalization**: If the agent is uncertain about a grouping — for example, ambiguous naming conventions, unusual hierarchy structures, or sub-booleans that do not clearly belong to the container — it should fall back to rendering individual chapters (the pre-normalization behavior) rather than producing incorrect unified chapters.
+
+
+## Template Placement and Layout (claudeSpec)
+
+### Smart Placement on Import
+When importing and detaching a template, do NOT use viewport center placement. Instead, scan the page for existing frames and place the new template to the right of all existing content with a 100px gutter, top-aligned:
+
+```javascript
+// Replace viewport-center placement with this:
+const existing = figma.currentPage.children.filter(n => n.type === 'FRAME');
+let rightEdge = 0;
+let topY = Infinity;
+for (const f of existing) {
+  rightEdge = Math.max(rightEdge, f.x + f.width);
+  topY = Math.min(topY, f.y);
+}
+if (topY === Infinity) topY = 0;
+frame.x = existing.length > 0 ? rightEdge + 100 : 0;
+frame.y = existing.length > 0 ? topY : 0;
+```
+
+### Final Tidy-Up
+After all specs are generated, arrange them alphabetically by name, top-aligned with 100px gutters. Place spec frames to the right of any non-spec content on the page:
+
+```javascript
+const page = figma.currentPage;
+const SPEC_SUFFIXES = ['Anatomy', 'API', 'Color Annotation', 'Properties', 'Screen Reader', 'Structure'];
+const specFrames = page.children.filter(n => 
+  n.type === 'FRAME' && SPEC_SUFFIXES.some(s => n.name.includes(s))
+);
+specFrames.sort((a, b) => a.name.localeCompare(b.name));
+const topY = Math.min(...specFrames.map(f => f.y));
+const nonSpecFrames = page.children.filter(n => 
+  n.type === 'FRAME' && !SPEC_SUFFIXES.some(s => n.name.includes(s))
+);
+let startX = 0;
+if (nonSpecFrames.length > 0) {
+  startX = Math.max(...nonSpecFrames.map(f => f.x + f.width)) + 200;
+}
+let currentX = startX;
+for (const frame of specFrames) {
+  frame.x = currentX;
+  frame.y = topY;
+  currentX += frame.width + 100;
+}
+figma.viewport.scrollAndZoomIntoView(specFrames);
+```
+
+See `skills/shared/UTILITIES.md` for full documentation.

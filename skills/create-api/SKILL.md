@@ -586,3 +586,52 @@ return { success: true };
 - The target node can be either a `COMPONENT_SET` (multi-variant) or a standalone `COMPONENT` (single variant). The extraction script detects the type and returns `isComponentSet` accordingly. When the node is a standalone component, there are no variant axes — only boolean, instance swap, and variable mode properties apply. Instance creation in Step 12 uses `compNode.createInstance()` directly for standalone components.
 - The extraction script (Step 4b) programmatically reads `componentPropertyDefinitions` from the component set or component, capturing all variant axes (with options and defaults), boolean toggles (with associated layer names and raw keys), and instance swap properties. This structured data makes property identification in Step 5 deterministic rather than relying solely on LLM interpretation of MCP tool output. The `rawKey` values (including `#nodeId` suffixes) are needed for `setProperties()` when creating configuration example previews in Step 12.
 - The instruction file (`api/agent-api-instruction.md`) contains the JSON schema, examples, and property classification rules. The AI reasoning for property identification is unchanged — only the delivery mechanism has changed.
+
+
+## Template Placement and Layout (claudeSpec)
+
+### Smart Placement on Import
+When importing and detaching a template, do NOT use viewport center placement. Instead, scan the page for existing frames and place the new template to the right of all existing content with a 100px gutter, top-aligned:
+
+```javascript
+// Replace viewport-center placement with this:
+const existing = figma.currentPage.children.filter(n => n.type === 'FRAME');
+let rightEdge = 0;
+let topY = Infinity;
+for (const f of existing) {
+  rightEdge = Math.max(rightEdge, f.x + f.width);
+  topY = Math.min(topY, f.y);
+}
+if (topY === Infinity) topY = 0;
+frame.x = existing.length > 0 ? rightEdge + 100 : 0;
+frame.y = existing.length > 0 ? topY : 0;
+```
+
+### Final Tidy-Up
+After all specs are generated, arrange them alphabetically by name, top-aligned with 100px gutters. Place spec frames to the right of any non-spec content on the page:
+
+```javascript
+const page = figma.currentPage;
+const SPEC_SUFFIXES = ['Anatomy', 'API', 'Color Annotation', 'Properties', 'Screen Reader', 'Structure'];
+const specFrames = page.children.filter(n => 
+  n.type === 'FRAME' && SPEC_SUFFIXES.some(s => n.name.includes(s))
+);
+specFrames.sort((a, b) => a.name.localeCompare(b.name));
+const topY = Math.min(...specFrames.map(f => f.y));
+const nonSpecFrames = page.children.filter(n => 
+  n.type === 'FRAME' && !SPEC_SUFFIXES.some(s => n.name.includes(s))
+);
+let startX = 0;
+if (nonSpecFrames.length > 0) {
+  startX = Math.max(...nonSpecFrames.map(f => f.x + f.width)) + 200;
+}
+let currentX = startX;
+for (const frame of specFrames) {
+  frame.x = currentX;
+  frame.y = topY;
+  currentX += frame.width + 100;
+}
+figma.viewport.scrollAndZoomIntoView(specFrames);
+```
+
+See `skills/shared/UTILITIES.md` for full documentation.

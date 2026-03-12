@@ -1,4 +1,3 @@
-[UTILITIES.md](https://github.com/user-attachments/files/25946496/UTILITIES.md)
 # Shared Utilities
 
 Scripts used across all claudeSpec skills for consistent template placement and layout.

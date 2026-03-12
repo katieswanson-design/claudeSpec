@@ -1060,3 +1060,52 @@ await Promise.all(fontsToLoad.map(f => figma.loadFontAsync(f)));
 
 ### Configuration Source
 In claudeSpec, template keys and font family come from conversation context or Claude's memory — not from a local `uspecs.config.json` file. Ask the user for template keys if they're not in memory, or run the setup-library skill first.
+
+
+## Template Placement and Layout (claudeSpec)
+
+### Smart Placement on Import
+When importing and detaching a template, do NOT use viewport center placement. Instead, scan the page for existing frames and place the new template to the right of all existing content with a 100px gutter, top-aligned:
+
+```javascript
+// Replace viewport-center placement with this:
+const existing = figma.currentPage.children.filter(n => n.type === 'FRAME');
+let rightEdge = 0;
+let topY = Infinity;
+for (const f of existing) {
+  rightEdge = Math.max(rightEdge, f.x + f.width);
+  topY = Math.min(topY, f.y);
+}
+if (topY === Infinity) topY = 0;
+frame.x = existing.length > 0 ? rightEdge + 100 : 0;
+frame.y = existing.length > 0 ? topY : 0;
+```
+
+### Final Tidy-Up
+After all specs are generated, arrange them alphabetically by name, top-aligned with 100px gutters. Place spec frames to the right of any non-spec content on the page:
+
+```javascript
+const page = figma.currentPage;
+const SPEC_SUFFIXES = ['Anatomy', 'API', 'Color Annotation', 'Properties', 'Screen Reader', 'Structure'];
+const specFrames = page.children.filter(n => 
+  n.type === 'FRAME' && SPEC_SUFFIXES.some(s => n.name.includes(s))
+);
+specFrames.sort((a, b) => a.name.localeCompare(b.name));
+const topY = Math.min(...specFrames.map(f => f.y));
+const nonSpecFrames = page.children.filter(n => 
+  n.type === 'FRAME' && !SPEC_SUFFIXES.some(s => n.name.includes(s))
+);
+let startX = 0;
+if (nonSpecFrames.length > 0) {
+  startX = Math.max(...nonSpecFrames.map(f => f.x + f.width)) + 200;
+}
+let currentX = startX;
+for (const frame of specFrames) {
+  frame.x = currentX;
+  frame.y = topY;
+  currentX += frame.width + 100;
+}
+figma.viewport.scrollAndZoomIntoView(specFrames);
+```
+
+See `skills/shared/UTILITIES.md` for full documentation.
